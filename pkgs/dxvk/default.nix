@@ -9,6 +9,7 @@
   windows,
   stdenv,
   pins,
+  python3,
 }: let
   inherit (pins) dxvk dxvk-async;
 in
@@ -19,9 +20,17 @@ in
     enableParallelBuilding = true;
     separateDebugInfo = true;
 
+    nativeBuildInputs = [
+      python3
+    ];
+
     buildInputs =
       lib.optionals stdenv.targetPlatform.isWindows [windows.pthreads]
       ++ lib.optionals stdenv.targetPlatform.isLinux [SDL2];
+
+    postPatch = ''
+      patchShebangs ./
+    '';
 
     depsBuildBuild = [
       meson
@@ -30,14 +39,11 @@ in
     ];
 
     patches = [
-      (dxvk-async + "/dxvk-async.patch")
+      # TODO: do we want to carry an async patch?
+      # (dxvk-async + "/dxvk-async.patch")
     ];
 
     mesonFlags = ["--buildtype=release"];
-
-    postInstall = lib.optionalString stdenv.targetPlatform.isWindows ''
-      ln -s ${windows.mcfgthreads}/bin/mcfgthread-12.dll $out/bin/mcfgthread-12.dll
-    '';
 
     src = dxvk;
 
@@ -47,5 +53,7 @@ in
       homepage = "https://github.com/doitsujin/dxvk";
       maintainers = with lib.maintainers; [LunNova];
       platforms = platforms.linux ++ platforms.windows;
+      # GCC <13 ends up with an extra dep on mcfg-threads12
+      broken = stdenv.cc.isGNU && lib.versionOlder stdenv.cc.version "13";
     };
   }
